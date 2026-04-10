@@ -3,7 +3,6 @@ from pathlib import Path
 
 import streamlit as st
 
-from auth import check_password
 from processor import (
     run_pipeline,
     save_uploaded_file,
@@ -13,13 +12,33 @@ from processor import (
 st.set_page_config(page_title="Voice File Matrix Generator", layout="wide")
 
 
+def check_password():
+    if "authenticated" not in st.session_state:
+        st.session_state.authenticated = False
+
+    if st.session_state.authenticated:
+        return True
+
+    st.title("Enter Password")
+    password = st.text_input("Password", type="password")
+
+    if st.button("Enter"):
+        if password == "P4@admin":
+            st.session_state.authenticated = True
+            st.rerun()
+        else:
+            st.error("Wrong password")
+
+    return False
+
+
 def main():
     if not check_password():
         st.stop()
 
     st.title("Voice File Matrix Generator")
     st.write(
-        "Upload the raw audio list, all master/transfer Excel files, and all audio files."
+        "Upload the raw audio list, all master/transfer Excel files, and optionally audio files."
     )
 
     raw_audio_list_file = st.file_uploader(
@@ -36,14 +55,14 @@ def main():
     )
 
     audio_files = st.file_uploader(
-        "Upload all audio files",
+        "Upload all audio files (optional)",
         accept_multiple_files=True,
         key="audio_files",
     )
 
     make_organized_folders = st.checkbox(
         "Also create organized folders with copied audio + transcriptions",
-        value=True,
+        value=False,
     )
 
     if st.button("Run Processing", type="primary"):
@@ -55,8 +74,8 @@ def main():
             st.error("Please upload the master/transfer Excel files.")
             return
 
-        if not audio_files:
-            st.error("Please upload the audio files.")
+        if make_organized_folders and not audio_files:
+            st.error("You turned on organized folders, so audio files are required.")
             return
 
         with st.spinner("Processing files..."):
@@ -79,8 +98,9 @@ def main():
                 for uploaded_excel in excel_files:
                     save_uploaded_file(uploaded_excel, excel_root / uploaded_excel.name)
 
-                for uploaded_audio in audio_files:
-                    save_uploaded_file(uploaded_audio, voice_folder / uploaded_audio.name)
+                if audio_files:
+                    for uploaded_audio in audio_files:
+                        save_uploaded_file(uploaded_audio, voice_folder / uploaded_audio.name)
 
                 output_csv = output_dir / "final_voice_file_matrix.csv"
 
@@ -100,7 +120,7 @@ def main():
 
                     st.success(f"Done. Total rows: {len(df_final)}")
 
-                    st.subheader("Preview")
+                    st.subheader("Full Output")
                     st.dataframe(df_final, use_container_width=True)
 
                     with open(output_csv, "rb") as f:
@@ -122,6 +142,98 @@ def main():
                                 file_name="organized_files_with_time.zip",
                                 mime="application/zip",
                             )
+
+                    st.subheader("Lookup Tool")
+
+                    lookup_df = df_final.copy()
+
+                    col1, col2 = st.columns(2)
+
+                    with col1:
+                        line_options = ["All"] + sorted(
+                            lookup_df["Train Line"].dropna().astype(str).unique().tolist()
+                        )
+                        selected_line = st.selectbox("Train Line", line_options)
+
+                        station_options = ["All"] + sorted(
+                            lookup_df["Station Name"].dropna().astype(str).unique().tolist()
+                        )
+                        selected_station = st.selectbox("Station Name", station_options)
+
+                        station_code_search = st.text_input("Search by station code")
+
+                    with col2:
+                        direction_options = ["All"] + sorted(
+                            lookup_df["Direction"].dropna().astype(str).unique().tolist()
+                        )
+                        selected_direction = st.selectbox("Direction", direction_options)
+
+                        time_options = ["All"] + sorted(
+                            lookup_df["Time Slot"].dropna().astype(str).unique().tolist()
+                        )
+                        selected_time = st.selectbox("Time Slot", time_options)
+
+                        voice_search = st.text_input("Search by voice file")
+
+                    transcript_search = st.text_input("Search transcript")
+
+                    if selected_line != "All":
+                        lookup_df = lookup_df[
+                            lookup_df["Train Line"].astype(str) == selected_line
+                        ]
+
+                    if selected_station != "All":
+                        lookup_df = lookup_df[
+                            lookup_df["Station Name"].astype(str) == selected_station
+                        ]
+
+                    if selected_direction != "All":
+                        lookup_df = lookup_df[
+                            lookup_df["Direction"].astype(str) == selected_direction
+                        ]
+
+                    if selected_time != "All":
+                        lookup_df = lookup_df[
+                            lookup_df["Time Slot"].astype(str) == selected_time
+                        ]
+
+                    if station_code_search.strip():
+                        lookup_df = lookup_df[
+                            lookup_df["Station Code"].astype(str).str.contains(
+                                station_code_search.strip(),
+                                case=False,
+                                na=False,
+                            )
+                        ]
+
+                    if voice_search.strip():
+                        lookup_df = lookup_df[
+                            lookup_df["Voice File"].astype(str).str.contains(
+                                voice_search.strip(),
+                                case=False,
+                                na=False,
+                            )
+                        ]
+
+                    if transcript_search.strip():
+                        lookup_df = lookup_df[
+                            lookup_df["Transcript"].astype(str).str.contains(
+                                transcript_search.strip(),
+                                case=False,
+                                na=False,
+                            )
+                        ]
+
+                    st.write(f"Matches: {len(lookup_df)}")
+                    st.dataframe(lookup_df, use_container_width=True)
+
+                    filtered_csv = lookup_df.to_csv(index=False).encode("utf-8")
+                    st.download_button(
+                        label="Download filtered results",
+                        data=filtered_csv,
+                        file_name="filtered_lookup_results.csv",
+                        mime="text/csv",
+                    )
 
                 except Exception as e:
                     st.exception(e)
