@@ -99,7 +99,7 @@ def find_matching_column(df, candidates):
 
 def extract_train_line(master_filename):
     base = os.path.basename(master_filename)
-    base = base.replace("_Master.xls", "")
+    base = base.replace("_Master.xls", "").replace("_Master.xlsx", "")
     return base.split("_")[-1].strip()
 
 
@@ -172,6 +172,9 @@ def load_transcriptions_from_raw_audio_list(audio_list_path):
 def build_audio_index(audio_root):
     index = {}
 
+    if not audio_root or not os.path.exists(audio_root):
+        return index
+
     for root, _, files in os.walk(audio_root):
         for f in files:
             index[f.lower()] = os.path.join(root, f)
@@ -183,7 +186,9 @@ def build_final_dataset(excel_root, df_transcribe):
     results = []
 
     for root, _, files in os.walk(excel_root):
-        master_files = [f for f in files if f.endswith("_Master.xls") or f.endswith("_Master.xlsx")]
+        master_files = [
+            f for f in files if f.endswith("_Master.xls") or f.endswith("_Master.xlsx")
+        ]
 
         for master_file in master_files:
             master_path = os.path.join(root, master_file)
@@ -212,7 +217,9 @@ def build_final_dataset(excel_root, df_transcribe):
             transfer_files = [
                 os.path.join(root, f)
                 for f in files
-                if "Transfer" in f and train_line in f and (f.endswith(".xls") or f.endswith(".xlsx"))
+                if "Transfer" in f
+                and train_line in f
+                and (f.endswith(".xls") or f.endswith(".xlsx"))
             ]
 
             for transfer_file in transfer_files:
