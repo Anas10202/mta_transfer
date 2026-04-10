@@ -1,7 +1,6 @@
 import tempfile
 from pathlib import Path
 
-import pandas as pd
 import streamlit as st
 
 from processor import (
@@ -36,76 +35,32 @@ def check_password():
 def render_lookup_tool(df_final):
     st.subheader("Lookup Tool")
 
-    base_df = df_final.copy()
-    lookup_df = base_df.copy()
+    base_df = df_final
+    lookup_df = df_final
+
+    line_options = ["All"] + sorted(
+        base_df["Train Line"].dropna().astype(str).unique().tolist()
+    )
+    station_options = ["All"] + sorted(
+        base_df["Station Name"].dropna().astype(str).unique().tolist()
+    )
+    direction_options = ["All"] + sorted(
+        base_df["Direction"].dropna().astype(str).unique().tolist()
+    )
+    time_options = ["All"] + sorted(
+        base_df["Time Slot"].dropna().astype(str).unique().tolist()
+    )
 
     col1, col2 = st.columns(2)
 
     with col1:
-        line_options = ["All"] + sorted(
-            base_df["Train Line"].dropna().astype(str).unique().tolist()
-        )
         selected_line = st.selectbox("Train Line", line_options, key="selected_line")
-
-        station_source_df = base_df.copy()
-        if selected_line != "All":
-            station_source_df = station_source_df[
-                station_source_df["Train Line"].astype(str) == selected_line
-            ]
-
-        station_options = ["All"] + sorted(
-            station_source_df["Station Name"].dropna().astype(str).unique().tolist()
-        )
-        selected_station = st.selectbox(
-            "Station Name",
-            station_options,
-            key="selected_station",
-        )
-
-        station_code_search = st.text_input(
-            "Search by station code",
-            key="station_code_search",
-        )
+        selected_station = st.selectbox("Station Name", station_options, key="selected_station")
+        station_code_search = st.text_input("Search by station code", key="station_code_search")
 
     with col2:
-        direction_source_df = base_df.copy()
-        if selected_line != "All":
-            direction_source_df = direction_source_df[
-                direction_source_df["Train Line"].astype(str) == selected_line
-            ]
-        if selected_station != "All":
-            direction_source_df = direction_source_df[
-                direction_source_df["Station Name"].astype(str) == selected_station
-            ]
-
-        direction_options = ["All"] + sorted(
-            direction_source_df["Direction"].dropna().astype(str).unique().tolist()
-        )
-        selected_direction = st.selectbox(
-            "Direction",
-            direction_options,
-            key="selected_direction",
-        )
-
-        time_source_df = base_df.copy()
-        if selected_line != "All":
-            time_source_df = time_source_df[
-                time_source_df["Train Line"].astype(str) == selected_line
-            ]
-        if selected_station != "All":
-            time_source_df = time_source_df[
-                time_source_df["Station Name"].astype(str) == selected_station
-            ]
-        if selected_direction != "All":
-            time_source_df = time_source_df[
-                time_source_df["Direction"].astype(str) == selected_direction
-            ]
-
-        time_options = ["All"] + sorted(
-            time_source_df["Time Slot"].dropna().astype(str).unique().tolist()
-        )
+        selected_direction = st.selectbox("Direction", direction_options, key="selected_direction")
         selected_time = st.selectbox("Time Slot", time_options, key="selected_time")
-
         voice_search = st.text_input("Search by voice file", key="voice_search")
 
     transcript_search = st.text_input("Search transcript", key="transcript_search")
@@ -150,7 +105,7 @@ def render_lookup_tool(df_final):
         ]
 
     st.write(f"Matches: {len(lookup_df)}")
-    st.dataframe(lookup_df, use_container_width=True)
+    st.dataframe(lookup_df, use_container_width=True, height=450)
 
     filtered_csv = lookup_df.to_csv(index=False).encode("utf-8")
     st.download_button(
@@ -261,10 +216,7 @@ def main():
 
                 if audio_files:
                     for uploaded_audio in audio_files:
-                        save_uploaded_file(
-                            uploaded_audio,
-                            voice_folder / uploaded_audio.name,
-                        )
+                        save_uploaded_file(uploaded_audio, voice_folder / uploaded_audio.name)
 
                 output_csv = output_dir / "final_voice_file_matrix.csv"
 
@@ -285,7 +237,7 @@ def main():
                         st.session_state.organized_zip_bytes = None
                         return
 
-                    st.session_state.processed_df = df_final.copy()
+                    st.session_state.processed_df = df_final
 
                     with open(output_csv, "rb") as f:
                         st.session_state.processed_csv_bytes = f.read()
@@ -307,8 +259,16 @@ def main():
     if st.session_state.processed_df is not None:
         df_final = st.session_state.processed_df
 
-        st.subheader("Full Output")
-        st.dataframe(df_final, use_container_width=True)
+        st.subheader("Results")
+        st.write(f"Total rows: {len(df_final)}")
+
+        show_full_table = st.checkbox("Show full output table", value=False)
+
+        if show_full_table:
+            st.dataframe(df_final, use_container_width=True, height=450)
+        else:
+            st.write("Preview:")
+            st.dataframe(df_final.head(100), use_container_width=True, height=350)
 
         if st.session_state.processed_csv_bytes is not None:
             st.download_button(
