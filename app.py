@@ -32,6 +32,156 @@ def check_password():
     return False
 
 
+def render_lookup_tool(df_final):
+    st.subheader("Lookup Tool")
+
+    base_df = df_final.copy()
+    lookup_df = base_df.copy()
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        line_options = ["All"] + sorted(
+            base_df["Train Line"].dropna().astype(str).unique().tolist()
+        )
+        selected_line = st.selectbox(
+            "Train Line",
+            line_options,
+            key="selected_line",
+        )
+
+        station_source_df = base_df.copy()
+        if selected_line != "All":
+            station_source_df = station_source_df[
+                station_source_df["Train Line"].astype(str) == selected_line
+            ]
+
+        station_options = ["All"] + sorted(
+            station_source_df["Station Name"].dropna().astype(str).unique().tolist()
+        )
+        selected_station = st.selectbox(
+            "Station Name",
+            station_options,
+            key="selected_station",
+        )
+
+        station_code_search = st.text_input(
+            "Search by station code",
+            key="station_code_search",
+        )
+
+    with col2:
+        direction_source_df = base_df.copy()
+        if selected_line != "All":
+            direction_source_df = direction_source_df[
+                direction_source_df["Train Line"].astype(str) == selected_line
+            ]
+        if selected_station != "All":
+            direction_source_df = direction_source_df[
+                direction_source_df["Station Name"].astype(str) == selected_station
+            ]
+
+        direction_options = ["All"] + sorted(
+            direction_source_df["Direction"].dropna().astype(str).unique().tolist()
+        )
+        selected_direction = st.selectbox(
+            "Direction",
+            direction_options,
+            key="selected_direction",
+        )
+
+        time_source_df = base_df.copy()
+        if selected_line != "All":
+            time_source_df = time_source_df[
+                time_source_df["Train Line"].astype(str) == selected_line
+            ]
+        if selected_station != "All":
+            time_source_df = time_source_df[
+                time_source_df["Station Name"].astype(str) == selected_station
+            ]
+        if selected_direction != "All":
+            time_source_df = time_source_df[
+                time_source_df["Direction"].astype(str) == selected_direction
+            ]
+
+        time_options = ["All"] + sorted(
+            time_source_df["Time Slot"].dropna().astype(str).unique().tolist()
+        )
+        selected_time = st.selectbox(
+            "Time Slot",
+            time_options,
+            key="selected_time",
+        )
+
+        voice_search = st.text_input(
+            "Search by voice file",
+            key="voice_search",
+        )
+
+    transcript_search = st.text_input(
+        "Search transcript",
+        key="transcript_search",
+    )
+
+    if selected_line != "All":
+        lookup_df = lookup_df[
+            lookup_df["Train Line"].astype(str) == selected_line
+        ]
+
+    if selected_station != "All":
+        lookup_df = lookup_df[
+            lookup_df["Station Name"].astype(str) == selected_station
+        ]
+
+    if selected_direction != "All":
+        lookup_df = lookup_df[
+            lookup_df["Direction"].astype(str) == selected_direction
+        ]
+
+    if selected_time != "All":
+        lookup_df = lookup_df[
+            lookup_df["Time Slot"].astype(str) == selected_time
+        ]
+
+    if station_code_search.strip():
+        lookup_df = lookup_df[
+            lookup_df["Station Code"].astype(str).str.contains(
+                station_code_search.strip(),
+                case=False,
+                na=False,
+            )
+        ]
+
+    if voice_search.strip():
+        lookup_df = lookup_df[
+            lookup_df["Voice File"].astype(str).str.contains(
+                voice_search.strip(),
+                case=False,
+                na=False,
+            )
+        ]
+
+    if transcript_search.strip():
+        lookup_df = lookup_df[
+            lookup_df["Transcript"].astype(str).str.contains(
+                transcript_search.strip(),
+                case=False,
+                na=False,
+            )
+        ]
+
+    st.write(f"Matches: {len(lookup_df)}")
+    st.dataframe(lookup_df, use_container_width=True)
+
+    filtered_csv = lookup_df.to_csv(index=False).encode("utf-8")
+    st.download_button(
+        label="Download filtered results",
+        data=filtered_csv,
+        file_name="filtered_lookup_results.csv",
+        mime="text/csv",
+    )
+
+
 def main():
     if not check_password():
         st.stop()
@@ -143,97 +293,7 @@ def main():
                                 mime="application/zip",
                             )
 
-                    st.subheader("Lookup Tool")
-
-                    lookup_df = df_final.copy()
-
-                    col1, col2 = st.columns(2)
-
-                    with col1:
-                        line_options = ["All"] + sorted(
-                            lookup_df["Train Line"].dropna().astype(str).unique().tolist()
-                        )
-                        selected_line = st.selectbox("Train Line", line_options)
-
-                        station_options = ["All"] + sorted(
-                            lookup_df["Station Name"].dropna().astype(str).unique().tolist()
-                        )
-                        selected_station = st.selectbox("Station Name", station_options)
-
-                        station_code_search = st.text_input("Search by station code")
-
-                    with col2:
-                        direction_options = ["All"] + sorted(
-                            lookup_df["Direction"].dropna().astype(str).unique().tolist()
-                        )
-                        selected_direction = st.selectbox("Direction", direction_options)
-
-                        time_options = ["All"] + sorted(
-                            lookup_df["Time Slot"].dropna().astype(str).unique().tolist()
-                        )
-                        selected_time = st.selectbox("Time Slot", time_options)
-
-                        voice_search = st.text_input("Search by voice file")
-
-                    transcript_search = st.text_input("Search transcript")
-
-                    if selected_line != "All":
-                        lookup_df = lookup_df[
-                            lookup_df["Train Line"].astype(str) == selected_line
-                        ]
-
-                    if selected_station != "All":
-                        lookup_df = lookup_df[
-                            lookup_df["Station Name"].astype(str) == selected_station
-                        ]
-
-                    if selected_direction != "All":
-                        lookup_df = lookup_df[
-                            lookup_df["Direction"].astype(str) == selected_direction
-                        ]
-
-                    if selected_time != "All":
-                        lookup_df = lookup_df[
-                            lookup_df["Time Slot"].astype(str) == selected_time
-                        ]
-
-                    if station_code_search.strip():
-                        lookup_df = lookup_df[
-                            lookup_df["Station Code"].astype(str).str.contains(
-                                station_code_search.strip(),
-                                case=False,
-                                na=False,
-                            )
-                        ]
-
-                    if voice_search.strip():
-                        lookup_df = lookup_df[
-                            lookup_df["Voice File"].astype(str).str.contains(
-                                voice_search.strip(),
-                                case=False,
-                                na=False,
-                            )
-                        ]
-
-                    if transcript_search.strip():
-                        lookup_df = lookup_df[
-                            lookup_df["Transcript"].astype(str).str.contains(
-                                transcript_search.strip(),
-                                case=False,
-                                na=False,
-                            )
-                        ]
-
-                    st.write(f"Matches: {len(lookup_df)}")
-                    st.dataframe(lookup_df, use_container_width=True)
-
-                    filtered_csv = lookup_df.to_csv(index=False).encode("utf-8")
-                    st.download_button(
-                        label="Download filtered results",
-                        data=filtered_csv,
-                        file_name="filtered_lookup_results.csv",
-                        mime="text/csv",
-                    )
+                    render_lookup_tool(df_final)
 
                 except Exception as e:
                     st.exception(e)
